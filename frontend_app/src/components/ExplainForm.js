@@ -5,7 +5,7 @@ import React, { useState } from 'react';
  */
 
 // PUBLIC_INTERFACE
-export default function ExplainForm({ onGenerate = () => {}, isLoading = false }) {
+export default function ExplainForm({ onGenerate = () => {}, onReset = () => {}, isLoading = false }) {
   /** Accessible form with controlled textarea and submit button. */
   const [value, setValue] = useState('');
 
@@ -14,6 +14,12 @@ export default function ExplainForm({ onGenerate = () => {}, isLoading = false }
     const trimmed = value.trim();
     if (!trimmed) return;
     onGenerate(trimmed);
+  };
+
+  const handleReset = (e) => {
+    e.preventDefault();
+    setValue('');
+    onReset();
   };
 
   return (
@@ -32,7 +38,7 @@ export default function ExplainForm({ onGenerate = () => {}, isLoading = false }
         We’ll generate progressive explanations: ELI5, ELI15, Intermediate, Expert.
       </div>
 
-      <div className="form-actions">
+      <div className="form-actions" style={{ gap: 8 }}>
         <button
           type="submit"
           className="btn-primary"
@@ -40,6 +46,16 @@ export default function ExplainForm({ onGenerate = () => {}, isLoading = false }
           aria-busy={isLoading ? 'true' : 'false'}
         >
           {isLoading ? 'Generating…' : 'Generate Explanations'}
+        </button>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={handleReset}
+          disabled={isLoading === false && value.trim().length === 0}
+          aria-label="Reset"
+          title="Reset"
+        >
+          ↺ Reset
         </button>
       </div>
     </form>

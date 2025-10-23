@@ -1,31 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './App.css';
 import './index.css';
 import Header from './components/Header';
 import ExplainForm from './components/ExplainForm';
 import ExplanationList from './components/ExplanationList';
+import useExplainGenerator from './hooks/useExplainGenerator';
 
 // PUBLIC_INTERFACE
 function App() {
   /**
    * Root application component for ExplainLike5.
-   * Manages theme (light/dark), topic input, loading state, and placeholder explanations.
-   * Renders the header, form, and list of explanation cards.
+   * Manages theme (light/dark) and wires the progressive generation hook to the UI.
    */
   const [theme, setTheme] = useState('light');
-  const [topic, setTopic] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Placeholder explanations; will be replaced by real API data later.
-  const explanations = useMemo(() => {
-    if (!topic) return [];
-    return [
-      { level: 'ELI5', content: `Imagine ${topic} is a simple thing you use every day. Here’s the easiest way to think about it...` },
-      { level: 'ELI15', content: `${topic} is a bit more complex. Think of it like a system with parts that work together...` },
-      { level: 'Intermediate', content: `From a practical perspective, ${topic} involves several components interacting with clear rules and trade-offs...` },
-      { level: 'Expert', content: `Technically, ${topic} can be framed in terms of underlying principles, constraints, and formal abstractions...` },
-    ];
-  }, [topic]);
+  const { generate, loading, error, results, reset } = useExplainGenerator();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -40,14 +29,18 @@ function App() {
   // PUBLIC_INTERFACE
   const handleGenerate = async (inputText) => {
     /**
-     * Simulates generating explanations from a backend.
-     * Sets loading state and updates the topic. Replace with API call in future.
+     * Delegates to the progressive generation hook.
+     * If a run is active, it will be cancelled and replaced.
      */
-    setIsLoading(true);
-    setTopic(inputText.trim());
-    // Simulate async latency for loading UI
-    await new Promise((r) => setTimeout(r, 900));
-    setIsLoading(false);
+    await generate(inputText);
+  };
+
+  // PUBLIC_INTERFACE
+  const handleReset = () => {
+    /**
+     * Clears any running generation and wipes results.
+     */
+    reset();
   };
 
   return (
@@ -55,13 +48,18 @@ function App() {
       <Header theme={theme} onToggleTheme={toggleTheme} />
       <main className="container" role="main" aria-live="polite">
         <section aria-label="Explain Form" className="surface section">
-          <ExplainForm onGenerate={handleGenerate} isLoading={isLoading} />
+          <ExplainForm onGenerate={handleGenerate} onReset={handleReset} isLoading={loading} />
+          {error && (
+            <div className="loading" role="alert" style={{ marginTop: 12, borderStyle: 'solid', borderColor: 'var(--color-error)' }}>
+              {error}
+            </div>
+          )}
         </section>
 
         <section aria-label="Explanations" className="section">
           <ExplanationList
-            isLoading={isLoading}
-            explanations={explanations}
+            isLoading={loading}
+            explanations={results}
           />
         </section>
       </main>
