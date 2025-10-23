@@ -6,18 +6,35 @@ import React, { useState } from 'react';
 
 // PUBLIC_INTERFACE
 export default function ExplanationCard({ level, content }) {
-  /** A11y-friendly card with toggleable body and placeholder copy action. */
+  /** A11y-friendly card with toggleable body and copy action with visual feedback. */
   const [expanded, setExpanded] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   const toggle = () => setExpanded((v) => !v);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(content);
-      // Placeholder feedback; in future, use toast/snackbar
-      alert('Copied explanation to clipboard.');
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(content);
+      } else {
+        // Fallback: create a temp textarea if Clipboard API not available
+        const el = document.createElement('textarea');
+        el.value = content;
+        el.setAttribute('readonly', '');
+        el.style.position = 'absolute';
+        el.style.left = '-9999px';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      setCopied(true);
+      // Auto-hide the toast after a short delay
+      window.setTimeout(() => setCopied(false), 1400);
     } catch {
-      alert('Copy not supported in this environment.');
+      // If copy fails, show a temporary failure state
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
     }
   };
 
@@ -31,9 +48,10 @@ export default function ExplanationCard({ level, content }) {
             className="icon-btn"
             onClick={handleCopy}
             aria-label={`Copy ${level} explanation`}
+            aria-live="polite"
             title="Copy"
           >
-            📋 Copy
+            {copied ? '✅ Copied' : '📋 Copy'}
           </button>
           <button
             type="button"
@@ -50,6 +68,10 @@ export default function ExplanationCard({ level, content }) {
       {expanded && (
         <div id={`content-${level}`} className="card-content">
           <p>{content}</p>
+          {/* Inline toast region for screen readers and visual cue */}
+          <div role="status" aria-live="polite" className="sr-only">
+            {copied ? 'Copied to clipboard' : ''}
+          </div>
         </div>
       )}
     </article>
