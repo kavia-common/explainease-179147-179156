@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LEVELS, buildContentForLevel, BuildError } from '../utils/sampleData';
+import { explainProgressively, isApiEnabled } from '../api/client';
 
 /**
- * Hook providing mocked progressive explanation generation.
- * Exposes a generate(prompt) function that yields staged results at deterministic delays
- * across levels [ELI5, ELI15, Intermediate, Expert]. Supports cancellation/reset and basic errors.
+ * Hook providing progressive explanation generation.
+ * - If REACT_APP_API_BASE_URL is set, it uses the API client and returns full results at once.
+ * - Otherwise, it falls back to a mocked progressive generator with staged updates.
  */
 
 // PUBLIC_INTERFACE
@@ -12,7 +13,7 @@ export default function useExplainGenerator() {
   /**
    * PUBLIC_INTERFACE
    * Returns:
-   *  - generate(prompt: string): Promise<void>  -> starts staged generation
+   *  - generate(prompt: string): Promise<void>  -> starts staged generation or API call
    *  - loading: boolean                         -> true while generating
    *  - error: string | null                     -> error message if any
    *  - results: Array<{ level: string, content: string }>
@@ -61,14 +62,40 @@ export default function useExplainGenerator() {
     cancelledRef.current = false;
     const thisRun = runIdRef.current;
 
-    // Basic input validation + deterministic error for testing
+    // Basic input validation
     if (!prompt || !prompt.trim()) {
       setError('Please enter a topic or text to explain.');
       setLoading(false);
       return;
     }
+
+    // If API is enabled, use it and maintain the same output shape.
+    if (isApiEnabled()) {
+      try {
+        const data = await explainProgressively(prompt);
+
+        // If the run was cancelled mid-flight, don't update state.
+        if (cancelledRef.current || runIdRef.current !== thisRun) return;
+
+        // Normalize ordering and ensure the same visible order as mock
+        const order = new Map(LEVELS.map((lvl, i) => [lvl, i]));
+        const sorted = [...data].sort((a, b) => (order.get(a.level) ?? 99) - (order.get(b.level) ?? 99));
+
+        setResults(sorted);
+        setLoading(false);
+        return;
+      } catch (e) {
+        // On API error, present the error; do not fall back silently to mock to avoid confusion.
+        const message = e?.message || 'Failed to fetch explanations from API.';
+        setError(message);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Fallback: mocked progressive generator with staged updates.
+    // Deterministic mocked error when prompt contains "error"
     if (/error/i.test(prompt)) {
-      // Deterministic mocked error when prompt contains "error"
       setError('Mocked generation error: failed to process the input.');
       setLoading(false);
       return;
